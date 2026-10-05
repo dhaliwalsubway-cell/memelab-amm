@@ -1,0 +1,17 @@
+[package]
+name = "rocket-rat"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+anchor-lang = "1.2.0"
+anchor-spl = "1.2.0"
+dirs = "7.0.0"
+memelab-amm = { version = "0.1.0", path = "../../programs/memelab-amm", features = ["no-entrypoint"] }
+solana-client = "3.1.10"
+solana-instruction = "4.0.0"
+solana-keypair = "3.1.2"
+solana-message = "5.1.0"
+solana-signer = "3.0.1"
+solana-system-interface = "2.0.0"
+solana-transaction = "3.1.0"
