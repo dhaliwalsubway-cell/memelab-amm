@@ -41,6 +41,28 @@ fn quote_buy(
     println!("No transaction submitted.");
 }
 
+fn quote_sell(
+    pool_state: &memelab_amm::state::Pool,
+    mlab_amount: u64,
+) {
+    let sol_out = memelab_amm::math::amount_out(
+        mlab_amount,
+        pool_state.mlab_reserve,
+        pool_state.sol_reserve,
+        pool_state.fee_bps,
+    )
+    .expect("Could not calculate SELL quote");
+
+    println!("=== ROCKET RAT SELL QUOTE ===");
+    println!("Input RKTROT:   {}", mlab_amount as f64 / 1_000_000_000.0);
+    println!("Input units:    {}", mlab_amount);
+    println!("Expected SOL:   {}", sol_out as f64 / 1_000_000_000.0);
+    println!("Output lamports: {}", sol_out);
+    println!("Pool fee:       {} bps", pool_state.fee_bps);
+    println!("Quote only:     YES");
+    println!("No transaction submitted.");
+}
+
 fn build_buy_instruction(
     pool: Pubkey,
     vault: Pubkey,
@@ -189,6 +211,26 @@ fn main() {
         let sol_lamports = (sol * 1_000_000_000.0) as u64;
 
         quote_buy(&pool_state, sol_lamports);
+        return;
+    }
+
+    // ------------------------------------------------------------
+    // QUOTE-ONLY SELL MODE
+    // ------------------------------------------------------------
+
+    if args.len() == 3 && args[1] == "--quote-sell" {
+        let mlab: f64 = args[2]
+            .parse()
+            .expect("SELL amount must be a number of RKTROT");
+
+        assert!(
+            mlab > 0.0,
+            "SELL amount must be greater than zero"
+        );
+
+        let mlab_units = (mlab * 1_000_000_000.0) as u64;
+
+        quote_sell(&pool_state, mlab_units);
         return;
     }
 
