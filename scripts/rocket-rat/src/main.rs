@@ -4,6 +4,13 @@ use anchor_lang::{
 };
 use memelab_amm::constants::{POOL_SEED, VAULT_SEED};
 use solana_client::rpc_client::RpcClient;
+use solana_instruction::Instruction;
+use solana_transaction::{Message, VersionedMessage};
+use solana_signer::Signer;
+use solana_transaction::versioned::VersionedTransaction;
+use anchor_lang::InstructionData;
+use anchor_lang::ToAccountMetas;
+use solana_keypair::read_keypair_file;
 use std::env;
 
 fn quote_buy(
@@ -34,11 +41,46 @@ fn quote_buy(
     println!("No transaction submitted.");
 }
 
+fn build_buy_instruction(
+    pool: Pubkey,
+    vault: Pubkey,
+    rocket_rat_mint: Pubkey,
+    trader: Pubkey,
+    trader_mlab_account: Pubkey,
+    sol_amount: u64,
+    min_mlab_out: u64,
+) -> Instruction {
+    Instruction::new_with_bytes(
+        memelab_amm::ID,
+        &memelab_amm::instruction::SwapSolForMlab {
+            sol_amount,
+            min_mlab_out,
+        }
+        .data(),
+        memelab_amm::accounts::SwapSolForMlab {
+            trader,
+            pool,
+            mlab_mint: rocket_rat_mint,
+            mlab_vault: vault,
+            trader_mlab_account,
+            token_program: anchor_spl::token_interface::spl_token_2022::ID,
+            system_program: anchor_lang::solana_program::system_program::ID,
+        }
+        .to_account_metas(None),
+    )
+}
+
 fn main() {
     let args: Vec<String> = env::args().collect();
 
     let rpc_url = "http://localhost:8899";
     let client = RpcClient::new(rpc_url.to_string());
+    let payer_path = dirs::home_dir()
+        .expect("Could not determine home directory")
+        .join(".config/solana/memelab-devnet.json");
+    let payer = read_keypair_file(&payer_path)
+        .expect("Could not read local MemeLab keypair");
+    println!("Payer: {}", payer.pubkey());
 
     let rocket_rat_mint =
         Pubkey::try_from("Gu5HZ2r2CagGRFtttqeHRmY2cwpzJ3xXanYgcrS3G1jk")
@@ -147,6 +189,82 @@ fn main() {
         let sol_lamports = (sol * 1_000_000_000.0) as u64;
 
         quote_buy(&pool_state, sol_lamports);
+        return;
+    }
+
+    // ------------------------------------------------------------
+    // LOCAL BUY EXECUTION MODE
+    // ------------------------------------------------------------
+
+    if args.len() == 3 && args[1] == "--buy" {
+        let sol: f64 = args[2]
+            .parse()
+            .expect("BUY amount must be a number of SOL");
+
+        assert!(sol > 0.0, "BUY amount must be greater than zero");
+
+        let sol_lamports = (sol * 1_000_000_000.0) as u64;
+        let expected_mlab_out = memelab_amm::math::amount_out(
+            sol_lamports,
+            pool_state.sol_reserve,
+            pool_state.mlab_reserve,
+            pool_state.fee_bps,
+        )
+        .expect("Could not calculate BUY quote");
+
+        let trader_mlab_account = client
+            .get_token_accounts_by_owner(
+                &payer.pubkey(),
+                solana_client::rpc_request::TokenAccountsFilter::Mint(
+                    rocket_rat_mint,
+                ),
+            )
+            .expect("Could not find Rocket Rat token account")
+            .into_iter()
+            .find(|account| account.account.owner == anchor_spl::token_interface::spl_token_2022::ID.to_string())
+            .expect("Token-2022 Rocket Rat token account not found")
+            .pubkey;
+
+        let trader_mlab_account =
+            Pubkey::try_from(trader_mlab_account.as_str())
+                .expect("Invalid trader token account");
+
+        let buy_ix = build_buy_instruction(
+            pool,
+            vault,
+            rocket_rat_mint,
+            payer.pubkey(),
+            trader_mlab_account,
+            sol_lamports,
+            expected_mlab_out,
+        );
+
+        let blockhash = client
+            .get_latest_blockhash()
+            .expect("Could not fetch latest blockhash");
+
+        let message = Message::new_with_blockhash(
+            &[buy_ix],
+            Some(&payer.pubkey()),
+            &blockhash,
+        );
+
+        let tx = VersionedTransaction::try_new(
+            VersionedMessage::Legacy(message),
+            &[&payer],
+        )
+        .expect("Could not sign BUY transaction");
+
+        let signature = client
+            .send_and_confirm_transaction(&tx)
+            .expect("BUY transaction failed");
+
+        println!("=== ROCKET RAT LOCAL BUY EXECUTED ===");
+        println!("Input SOL:       {}", sol);
+        println!("Input lamports:  {}", sol_lamports);
+        println!("Expected RKTROT: {}", expected_mlab_out as f64 / 1_000_000_000.0);
+        println!("Signature:       {}", signature);
+        println!("LOCAL ONLY:      YES");
         return;
     }
 
