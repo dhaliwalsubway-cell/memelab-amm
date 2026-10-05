@@ -63,6 +63,35 @@ fn quote_sell(
     println!("No transaction submitted.");
 }
 
+fn build_sell_instruction(
+    pool: Pubkey,
+    vault: Pubkey,
+    rocket_rat_mint: Pubkey,
+    trader: Pubkey,
+    trader_mlab_account: Pubkey,
+    mlab_amount: u64,
+    min_sol_out: u64,
+) -> Instruction {
+    Instruction::new_with_bytes(
+        memelab_amm::ID,
+        &memelab_amm::instruction::SwapMlabForSol {
+            mlab_amount,
+            min_sol_out,
+        }
+        .data(),
+        memelab_amm::accounts::SwapMlabForSol {
+            trader,
+            pool,
+            mlab_mint: rocket_rat_mint,
+            mlab_vault: vault,
+            trader_mlab_account,
+            token_program: anchor_spl::token_interface::spl_token_2022::ID,
+            system_program: anchor_lang::solana_program::system_program::ID,
+        }
+        .to_account_metas(None),
+    )
+}
+
 fn build_buy_instruction(
     pool: Pubkey,
     vault: Pubkey,
@@ -237,6 +266,83 @@ fn main() {
     // ------------------------------------------------------------
     // LOCAL BUY EXECUTION MODE
     // ------------------------------------------------------------
+
+    if args.len() == 3 && args[1] == "--sell" {
+        let mlab: f64 = args[2]
+            .parse()
+            .expect("SELL amount must be a number of RKTROT");
+
+        assert!(mlab > 0.0, "SELL amount must be greater than zero");
+
+        let mlab_units = (mlab * 1_000_000_000.0) as u64;
+
+        let expected_sol_out = memelab_amm::math::amount_out(
+            mlab_units,
+            pool_state.mlab_reserve,
+            pool_state.sol_reserve,
+            pool_state.fee_bps,
+        )
+        .expect("Could not calculate SELL output");
+
+        println!("=== ROCKET RAT LOCAL SELL ===");
+        println!("Input RKTROT:   {}", mlab);
+        println!("Input units:    {}", mlab_units);
+        println!("Expected SOL:   {}", expected_sol_out as f64 / 1_000_000_000.0);
+        println!("Output lamports: {}", expected_sol_out);
+
+        let trader_mlab_account = client
+            .get_token_accounts_by_owner(
+                &payer.pubkey(),
+                solana_client::rpc_request::TokenAccountsFilter::Mint(rocket_rat_mint),
+            )
+            .expect("Could not find trader token account")
+            .into_iter()
+            .find(|account| {
+                account.account.owner
+                    == anchor_spl::token_interface::spl_token_2022::ID.to_string()
+            })
+            .expect("Could not find Token-2022 RKTROT account");
+
+        let trader_mlab_account: Pubkey = trader_mlab_account
+            .pubkey
+            .parse()
+            .expect("Invalid trader token account");
+
+        let instruction = build_sell_instruction(
+            pool,
+            vault,
+            rocket_rat_mint,
+            payer.pubkey(),
+            trader_mlab_account,
+            mlab_units,
+            expected_sol_out,
+        );
+
+        let recent_blockhash = client
+            .get_latest_blockhash()
+            .expect("Could not get recent blockhash");
+
+        let message = Message::new_with_blockhash(
+            &[instruction],
+            Some(&payer.pubkey()),
+            &recent_blockhash,
+        );
+
+        let versioned_message = VersionedMessage::Legacy(message);
+        let tx = VersionedTransaction::try_new(
+            versioned_message,
+            &[&payer],
+        )
+        .expect("Could not sign SELL transaction");
+
+        let signature = client
+            .send_and_confirm_transaction(&tx)
+            .expect("SELL transaction failed");
+
+        println!("SELL signature: {}", signature);
+        println!("LOCAL ONLY: YES");
+        return;
+    }
 
     if args.len() == 3 && args[1] == "--buy" {
         let sol: f64 = args[2]
