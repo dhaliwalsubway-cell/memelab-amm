@@ -1,6 +1,7 @@
 [workspace]
 members = [
     "programs/*",
+    "scripts/launcher",
     "scripts/rocket-rat"
 ]
 resolver = "2"
