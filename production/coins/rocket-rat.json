@@ -6,8 +6,8 @@
   "token_standard": "Token-2022",
   "network": "mainnet-beta",
   "role": "flagship",
-  "metadata_uri": null,
-  "image_uri": null,
+  "metadata_uri": "https://dhaliwalsubway-cell.github.io/memelab-amm/rocket-rat/metadata.json",
+  "image_uri": "https://dhaliwalsubway-cell.github.io/memelab-amm/rocket-rat/rocket-rat.png",
   "initial_liquidity": {
     "quote": "SOL",
     "sol": null,

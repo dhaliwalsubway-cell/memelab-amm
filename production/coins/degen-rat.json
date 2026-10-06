@@ -6,8 +6,8 @@
   "token_standard": "Token-2022",
   "network": "mainnet-beta",
   "role": "degen-sister",
-  "metadata_uri": null,
-  "image_uri": null,
+  "metadata_uri": "https://dhaliwalsubway-cell.github.io/memelab-amm/degen-rat/metadata.json",
+  "image_uri": "https://dhaliwalsubway-cell.github.io/memelab-amm/degen-rat/degen-rat.png",
   "initial_liquidity": {
     "quote": "SOL",
     "sol": null,

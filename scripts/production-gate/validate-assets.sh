@@ -55,12 +55,15 @@ for name, symbol, path in coins:
 
     assert data["name"] == name
     assert data["symbol"] == symbol
-    assert "__IMAGE_URI__" in data["image"]
-    assert "__WEBSITE_URI__" in data["external_url"]
+    assert data["image"].startswith("https://")
+    assert data["image"].endswith(".png")
+    assert data["external_url"].startswith("https://")
+    assert "__IMAGE_URI__" not in data["image"]
+    assert "__WEBSITE_URI__" not in data["external_url"]
 
     print(f"PASS: {name} metadata identity")
-    print(f"PENDING: {name} production image")
-    print(f"PENDING: {name} hosted metadata")
+    print(f"PASS: {name} production image URL")
+    print(f"PASS: {name} hosted metadata URL")
 PY
 
 echo ""
@@ -85,18 +88,20 @@ for coin in rocket-rat degen-rat; do
 done
 
 echo ""
-echo "--- PLACEHOLDER PROTECTION ---"
+echo "--- PRODUCTION URL PROTECTION ---"
 
-if grep -R "__IMAGE_URI__" production/metadata >/dev/null 2>&1; then
-    echo "PASS: metadata placeholders detected and protected"
+if grep -R "__IMAGE_URI__\|__WEBSITE_URI__" production/metadata >/dev/null 2>&1; then
+    echo "FAIL: production metadata still contains placeholders"
+    FAIL=1
 else
-    echo "WARNING: no image placeholders found"
+    echo "PASS: no production metadata placeholders"
 fi
 
-if grep -R "__WEBSITE_URI__" production/metadata >/dev/null 2>&1; then
-    echo "PASS: website placeholders detected and protected"
+if grep -R -E '\]\(https?://' production/metadata >/dev/null 2>&1; then
+    echo "FAIL: Markdown-wrapped production URL detected"
+    FAIL=1
 else
-    echo "WARNING: no website placeholders found"
+    echo "PASS: no Markdown-wrapped production URLs"
 fi
 
 echo ""
