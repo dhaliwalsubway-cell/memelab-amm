@@ -1,0 +1,25 @@
+{
+  "name": "Rocket Rat",
+  "symbol": "RKTROT",
+  "description": "Rocket Rat (RKTROT) is the flagship meme coin of the MemeLab universe. A fearless, confident and mischievous rat on a mission to the moon. Built by degens, for degens.",
+  "image": "__IMAGE_URI__",
+  "external_url": "__WEBSITE_URI__",
+  "attributes": [
+    {
+      "trait_type": "Universe",
+      "value": "MemeLab"
+    },
+    {
+      "trait_type": "Role",
+      "value": "Flagship"
+    },
+    {
+      "trait_type": "Personality",
+      "value": "Confident"
+    },
+    {
+      "trait_type": "Mission",
+      "value": "To The Moon"
+    }
+  ]
+}
