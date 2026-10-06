@@ -10,8 +10,10 @@
   "image_uri": "https://dhaliwalsubway-cell.github.io/memelab-amm/degen-rat/degen-rat.png",
   "initial_liquidity": {
     "quote": "SOL",
-    "sol": null,
-    "token": null
+    "sol": 3,
+    "token": "100000000",
+    "token_symbol": "DGRAT",
+    "initial_price_sol_per_token": "0.00000003"
   },
   "raydium": {
     "pool_type": "CPMM",
@@ -21,5 +23,14 @@
   "mint": null,
   "mint_authority": null,
   "freeze_authority": null,
-  "status": "PRODUCTION-PREP"
+  "status": "PRODUCTION-READY-PENDING-MINT",
+  "authority_policy": {
+    "mint_authority": "REVOKE_AFTER_INITIAL_MINT",
+    "freeze_authority": "NONE",
+    "metadata_update_authority": "REVOKE_AFTER_FINAL_VERIFICATION",
+    "fixed_supply": true,
+    "future_minting": false,
+    "freeze_capability": false,
+    "metadata_immutable": true
+  }
 }

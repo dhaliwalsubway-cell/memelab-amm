@@ -1,17 +1,31 @@
 # MemeLab Production Liquidity Policy
 
-## Rocket Rat
+## Rocket Rat — RKTROT/SOL
 
-Pair: RKTROT / SOL
-Initial SOL: PENDING
-Initial RKTROT: PENDING
-Initial price: PENDING
+- Total supply: 1,000,000,000 RKTROT
+- Initial SOL liquidity: 5 SOL
+- Initial RKTROT liquidity: 100,000,000 RKTROT
+- Initial pool token price: 0.00000005 SOL/RKTROT
+- Initial liquidity represents 10% of total token supply
+- Pair: RKTROT/SOL
+- Pool type: Raydium CPMM
 
-## Degen Rat
+## Degen Rat — DGRAT/SOL
 
-Pair: DGRAT / SOL
-Initial SOL: PENDING
-Initial DGRAT: PENDING
-Initial price: PENDING
+- Total supply: 1,000,000,000 DGRAT
+- Initial SOL liquidity: 3 SOL
+- Initial DGRAT liquidity: 100,000,000 DGRAT
+- Initial pool token price: 0.00000003 SOL/DGRAT
+- Initial liquidity represents 10% of total token supply
+- Pair: DGRAT/SOL
+- Pool type: Raydium CPMM
 
-No production liquidity may be deposited until explicitly approved.
+## Capital policy
+
+Rocket Rat receives the larger initial liquidity allocation because it is the flagship asset.
+
+Degen Rat receives a smaller initial allocation because it is the experimental/degen sister asset.
+
+No additional production liquidity is assumed or committed by this document.
+
+No liquidity may be transferred until the final launch gate is GREEN and human approval is explicitly given.
