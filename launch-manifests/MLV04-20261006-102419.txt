@@ -1,0 +1,31 @@
+MEME LAB PRODUCTION LAUNCH MANIFEST
+===================================
+
+Name:              MemeLab V04 Test
+Symbol:            MLV04
+Supply:            1000000000
+Decimals:          9
+Metadata URI:      https://example.com/mlv04.json
+SOL Liquidity:     1
+Token Liquidity:   100000000
+Fee BPS:           30
+
+Network:           NOT SELECTED
+Mint:              PENDING
+AMM Program:       PENDING
+Pool:              PENDING
+Vault:             PENDING
+
+STATUS:            PRE-LAUNCH
+MAINNET EXECUTION: BLOCKED
+
+Required before execution:
+- Real metadata JSON hosted and reachable
+- Correct image URL
+- Mainnet RPC explicitly selected
+- Mainnet payer explicitly selected
+- AMM program deployed and verified
+- Upgrade-authority decision completed
+- Liquidity amount confirmed
+- Token supply confirmed
+- Final launch parameters independently reviewed

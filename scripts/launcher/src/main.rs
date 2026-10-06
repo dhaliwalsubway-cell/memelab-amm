@@ -40,6 +40,34 @@ fn usage() {
     println!("--launch-local is required to submit local transactions.");
 }
 
+fn validate_metadata_uri(uri: &str) -> Result<(), String> {
+    let uri = uri.trim();
+
+    if uri.is_empty() {
+        return Err("metadata URI cannot be empty".to_string());
+    }
+
+    if uri.contains("](") || uri.starts_with("[") || uri.ends_with(")") {
+        return Err("metadata URI must be a plain URL, not Markdown-wrapped text".to_string());
+    }
+
+    let lower = uri.to_ascii_lowercase();
+
+    if !lower.starts_with("https://") {
+        return Err("metadata URI must use https://".to_string());
+    }
+
+    if uri.chars().any(|c| c.is_whitespace()) {
+        return Err("metadata URI cannot contain whitespace".to_string());
+    }
+
+    if !lower.ends_with(".json") {
+        return Err("metadata URI must point to a .json metadata document".to_string());
+    }
+
+    Ok(())
+}
+
 fn parse_ui_amount(value: &str, decimals: u8) -> Result<u64, String> {
     let value = value.trim();
     let mut parts = value.split('.');
@@ -302,13 +330,11 @@ struct LaunchArtifacts {
 
 #[derive(Debug, Clone)]
 struct PoolSnapshot {
-    authority: Pubkey,
     mlab_mint: Pubkey,
     mlab_vault: Pubkey,
     sol_reserve: u64,
     mlab_reserve: u64,
     fee_bps: u16,
-    bump: u8,
 }
 
 fn read_pool_snapshot(client: &RpcClient, pool: Pubkey) -> Result<PoolSnapshot, String> {
@@ -326,13 +352,11 @@ fn read_pool_snapshot(client: &RpcClient, pool: Pubkey) -> Result<PoolSnapshot, 
         .map_err(|e| format!("pool deserialization failed: {e}"))?;
 
     Ok(PoolSnapshot {
-        authority: state.authority,
         mlab_mint: state.mlab_mint,
         mlab_vault: state.mlab_vault,
         sol_reserve: state.sol_reserve,
         mlab_reserve: state.mlab_reserve,
         fee_bps: state.fee_bps,
-        bump: state.bump,
     })
 }
 
@@ -684,6 +708,11 @@ fn main() {
         self_test,
     };
 
+    if let Err(error) = validate_metadata_uri(&config.metadata_uri) {
+        eprintln!("ERROR: invalid metadata URI: {error}");
+        std::process::exit(1);
+    }
+
     let (supply_units, token_liquidity_units, sol_liquidity_lamports) =
         match validate_config(&config) {
             Ok(values) => values,
@@ -884,83 +913,40 @@ fn main() {
     println!("Network:          LOCALHOST ONLY");
 }
 
-#[derive(Debug, Clone)]
-struct SelfTestReport {
-    launch_verified: bool,
-    mint_verified: bool,
-    pool_verified: bool,
-    vault_verified: bool,
-    liquidity_verified: bool,
-}
-
-impl SelfTestReport {
-    fn green(&self) -> bool {
-        self.launch_verified
-            && self.mint_verified
-            && self.pool_verified
-            && self.vault_verified
-            && self.liquidity_verified
-    }
-
-    fn print(&self) {
-        println!();
-        println!("=== MEME LAB v0.3 SELF-TEST REPORT ===");
-        println!(
-            "Launch path:       {}",
-            if self.launch_verified { "GREEN" } else { "RED" }
-        );
-        println!(
-            "Mint:              {}",
-            if self.mint_verified { "GREEN" } else { "RED" }
-        );
-        println!(
-            "Pool:              {}",
-            if self.pool_verified { "GREEN" } else { "RED" }
-        );
-        println!(
-            "Vault:             {}",
-            if self.vault_verified { "GREEN" } else { "RED" }
-        );
-        println!(
-            "Liquidity:         {}",
-            if self.liquidity_verified {
-                "GREEN"
-            } else {
-                "RED"
-            }
-        );
-        println!(
-            "Overall:           {}",
-            if self.green() { "GREEN" } else { "RED" }
-        );
-    }
-}
-
 #[cfg(test)]
-mod v03_tests {
-    use super::*;
+mod metadata_uri_tests {
+    use super::validate_metadata_uri;
 
     #[test]
-    fn self_test_report_requires_every_gate() {
-        let report = SelfTestReport {
-            launch_verified: true,
-            mint_verified: true,
-            pool_verified: true,
-            vault_verified: true,
-            liquidity_verified: true,
-        };
-        assert!(report.green());
+    fn metadata_uri_accepts_valid_https_json() {
+        assert!(validate_metadata_uri("https://example.com/metadata.json").is_ok());
     }
 
     #[test]
-    fn self_test_report_fails_closed() {
-        let report = SelfTestReport {
-            launch_verified: true,
-            mint_verified: true,
-            pool_verified: true,
-            vault_verified: false,
-            liquidity_verified: true,
-        };
-        assert!(!report.green());
+    fn metadata_uri_validation_rejects_markdown() {
+        assert!(validate_metadata_uri(
+            "[https://example.com/metadata.json](https://example.com/metadata.json)"
+        )
+        .is_err());
+    }
+
+    #[test]
+    fn metadata_uri_validation_rejects_http() {
+        assert!(validate_metadata_uri("http://example.com/metadata.json").is_err());
+    }
+
+    #[test]
+    fn metadata_uri_validation_rejects_non_json() {
+        assert!(validate_metadata_uri("https://example.com/metadata.txt").is_err());
+    }
+
+    #[test]
+    fn metadata_uri_validation_rejects_whitespace() {
+        assert!(validate_metadata_uri("https://example.com/my metadata.json").is_err());
+    }
+
+    #[test]
+    fn metadata_uri_validation_rejects_empty() {
+        assert!(validate_metadata_uri("").is_err());
     }
 }
