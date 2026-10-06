@@ -1,0 +1,31 @@
+{
+  "plan_version": "1.0",
+  "status": "PREFLIGHT-ONLY-NOT-EXECUTED",
+  "network": "mainnet-beta",
+  "token_program": "Token-2022",
+  "coin": "Rocket Rat",
+  "symbol": "RKTROT",
+  "decimals": 9,
+  "total_supply_ui": "1000000000",
+  "total_supply_base_units": "1000000000000000000",
+  "metadata_uri": "https://dhaliwalsubway-cell.github.io/memelab-amm/rocket-rat/metadata.json",
+  "image_uri": "https://dhaliwalsubway-cell.github.io/memelab-amm/rocket-rat/rocket-rat.png",
+  "authority_policy": {
+    "mint_authority": "REVOKE_AFTER_INITIAL_MINT",
+    "freeze_authority": "NONE",
+    "metadata_update_authority": "REVOKE_AFTER_FINAL_VERIFICATION"
+  },
+  "initial_liquidity": {
+    "sol": "5",
+    "token_ui": "100000000",
+    "token_base_units": "100000000000000000",
+    "initial_price_sol_per_token": "0.00000005"
+  },
+  "execution": {
+    "signing": false,
+    "broadcast": false,
+    "mint_creation": false,
+    "liquidity_transfer": false,
+    "raydium_pool_creation": false
+  }
+}
