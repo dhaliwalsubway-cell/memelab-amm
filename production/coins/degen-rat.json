@@ -1,0 +1,19 @@
+{
+  "name": "Degen Rat",
+  "symbol": "DGRAT",
+  "supply": "1000000000",
+  "decimals": 9,
+  "token_standard": "Token-2022",
+  "metadata_uri": null,
+  "initial_liquidity": {
+    "sol": null,
+    "token": null
+  },
+  "fee_bps": 30,
+  "network": "MAINNET-BETA",
+  "mint": null,
+  "amm_program": null,
+  "pool": null,
+  "vault": null,
+  "status": "PRODUCTION-PREP"
+}
