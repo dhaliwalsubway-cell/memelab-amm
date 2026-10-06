@@ -3,7 +3,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dry-run": "tsx src/dry-run.ts"
+    "dry-run": "tsx src/dry-run.ts",
+    "cpmm-dry-run": "tsx src/cpmm-dry-run.ts"
   },
   "dependencies": {
     "@raydium-io/raydium-sdk-v2": "latest",
