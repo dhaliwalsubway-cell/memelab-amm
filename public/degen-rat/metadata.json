@@ -2,8 +2,8 @@
   "name": "Degen Rat",
   "symbol": "DGRAT",
   "description": "Degen Rat (DGRAT) is the chaotic sister meme coin of the MemeLab universe. Wild, reckless and permanently ready to send it.",
-  "image": "__IMAGE_URI__",
-  "external_url": "__WEBSITE_URI__",
+  "image": "https://dhaliwalsubway-cell.github.io/memelab-amm/degen-rat/degen-rat.png",
+  "external_url": "https://dhaliwalsubway-cell.github.io/memelab-amm/",
   "attributes": [
     {
       "trait_type": "Universe",

@@ -1,9 +1,9 @@
 {
   "name": "Rocket Rat",
   "symbol": "RKTROT",
-  "description": "Rocket Rat (RKTROT) is the flagship meme coin of the MemeLab universe. A fearless, confident and mischievous rat on a mission to the moon. Built by degens, for degens.",
-  "image": "__IMAGE_URI__",
-  "external_url": "__WEBSITE_URI__",
+  "description": "Rocket Rat (RKTROT) is the flagship meme coin of the MemeLab universe. A fearless, confident and mischievous rat on a mission to the moon. Built by degens, for degens. Same rat. Different universe.",
+  "image": "https://dhaliwalsubway-cell.github.io/memelab-amm/rocket-rat/rocket-rat.png",
+  "external_url": "https://dhaliwalsubway-cell.github.io/memelab-amm/",
   "attributes": [
     {
       "trait_type": "Universe",
