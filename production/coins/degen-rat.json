@@ -4,16 +4,22 @@
   "supply": "1000000000",
   "decimals": 9,
   "token_standard": "Token-2022",
+  "network": "mainnet-beta",
+  "role": "degen-sister",
   "metadata_uri": null,
+  "image_uri": null,
   "initial_liquidity": {
+    "quote": "SOL",
     "sol": null,
     "token": null
   },
-  "fee_bps": 30,
-  "network": "MAINNET-BETA",
+  "raydium": {
+    "pool_type": "CPMM",
+    "pool_id": null,
+    "lp_mint": null
+  },
   "mint": null,
-  "amm_program": null,
-  "pool": null,
-  "vault": null,
+  "mint_authority": null,
+  "freeze_authority": null,
   "status": "PRODUCTION-PREP"
 }

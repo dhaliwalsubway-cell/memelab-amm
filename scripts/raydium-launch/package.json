@@ -1,0 +1,16 @@
+{
+  "name": "memelab-raydium-launch",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dry-run": "tsx src/dry-run.ts"
+  },
+  "dependencies": {
+    "@raydium-io/raydium-sdk-v2": "latest",
+    "@solana/web3.js": "latest",
+    "bn.js": "latest",
+    "decimal.js": "latest",
+    "tsx": "latest",
+    "typescript": "latest"
+  }
+}

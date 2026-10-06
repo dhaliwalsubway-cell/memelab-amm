@@ -1,40 +1,31 @@
-# MemeLab Production Launch Order
+# MemeLab Rat Universe — Production Launch Order
 
-## Launch 1 — Rocket Rat
+## Rocket Rat — RKTROT
+1. Final master artwork
+2. Final hosted image URL
+3. Final hosted metadata JSON URL
+4. Mainnet Token-2022 mint
+5. Verify mint / authorities / supply
+6. Mint total supply
+7. Verify metadata
+8. Configure Raydium CPMM
+9. Review initial liquidity
+10. Create Raydium pool
+11. Verify pool
+12. Controlled first swap
+13. Public launch verification
 
-Name: Rocket Rat
-Ticker: RKTROT
+## Degen Rat — DGRAT
 
-Finalise:
-1. Master artwork
-2. Metadata JSON
-3. Metadata hosting
-4. Image hosting
-5. Production wallet
-6. Mainnet AMM deployment
-7. Initial liquidity
-8. Final launch manifest
-9. Mainnet transaction
-10. DEX/indexer visibility verification
+Repeat the complete process independently.
 
-## Launch 2 — Degen Rat
+## Hard rules
 
-Name: Degen Rat
-Ticker: DGRAT
-
-Follow the same controlled sequence independently.
-
-## Important
-
-Rocket Rat and Degen Rat are separate tokens.
-
-Never reuse:
-- mint address
-- token account
-- pool PDA
-- vault PDA
-- metadata URI
-
-A successful Rocket Rat launch does not automatically launch Degen Rat.
-
-Both launches require their own final confirmation.
+- Never reuse a mint between coins.
+- Never reuse metadata between coins.
+- Never launch with placeholder metadata.
+- Never launch with Markdown-wrapped URLs.
+- Never invent liquidity figures.
+- Never execute a mainnet transaction from a dry-run.
+- Never skip mint/authority verification.
+- Never treat MemeLab AMM as the public Raydium pool.

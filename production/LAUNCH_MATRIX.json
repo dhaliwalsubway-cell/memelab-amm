@@ -1,0 +1,25 @@
+{
+  "project": "MemeLab Rat Universe",
+  "network": "mainnet-beta",
+  "token_program": "Token-2022",
+  "dex": "Raydium",
+  "pool_type": "CPMM",
+  "coins": [
+    {
+      "name": "Rocket Rat",
+      "symbol": "RKTROT",
+      "config": "production/coins/rocket-rat.json",
+      "metadata": "production/metadata/rocket-rat.json",
+      "asset_directory": "production/assets/rocket-rat",
+      "status": "PREP"
+    },
+    {
+      "name": "Degen Rat",
+      "symbol": "DGRAT",
+      "config": "production/coins/degen-rat.json",
+      "metadata": "production/metadata/degen-rat.json",
+      "asset_directory": "production/assets/degen-rat",
+      "status": "PREP"
+    }
+  ]
+}
