@@ -1,5 +1,4 @@
 use anchor_lang::prelude::Pubkey;
-use anchor_lang::AccountDeserialize;
 use anchor_lang::{InstructionData, ToAccountMetas};
 use dirs::home_dir;
 use memelab_amm::constants::{POOL_SEED, VAULT_SEED};
@@ -27,7 +26,6 @@ struct LaunchConfig {
     token_liquidity: String,
     fee_bps: u16,
     execute: bool,
-    self_test: bool,
 }
 
 fn usage() {
@@ -292,379 +290,10 @@ fn validate_config(config: &LaunchConfig) -> Result<(u64, u64, u64), String> {
     Ok((supply, token_liquidity, sol_liquidity))
 }
 
-#[derive(Debug, Clone)]
-struct LaunchArtifacts {
-    mint: Pubkey,
-    source: Pubkey,
-    pool: Pubkey,
-    vault: Pubkey,
-}
-
-#[derive(Debug, Clone)]
-struct PoolSnapshot {
-    authority: Pubkey,
-    mlab_mint: Pubkey,
-    mlab_vault: Pubkey,
-    sol_reserve: u64,
-    mlab_reserve: u64,
-    fee_bps: u16,
-    bump: u8,
-}
-
-fn read_pool_snapshot(client: &RpcClient, pool: Pubkey) -> Result<PoolSnapshot, String> {
-    let account = client
-        .get_account(&pool)
-        .map_err(|e| format!("pool read failed: {e}"))?;
-
-    if account.owner != memelab_amm::ID {
-        return Err("pool is not owned by MemeLab AMM".into());
-    }
-
-    let mut data: &[u8] = &account.data;
-
-    let state = memelab_amm::Pool::try_deserialize(&mut data)
-        .map_err(|e| format!("pool deserialization failed: {e}"))?;
-
-    Ok(PoolSnapshot {
-        authority: state.authority,
-        mlab_mint: state.mlab_mint,
-        mlab_vault: state.mlab_vault,
-        sol_reserve: state.sol_reserve,
-        mlab_reserve: state.mlab_reserve,
-        fee_bps: state.fee_bps,
-        bump: state.bump,
-    })
-}
-
-fn token_balance(client: &RpcClient, token_account: Pubkey) -> Result<u64, String> {
-    let balance = client
-        .get_token_account_balance(&token_account)
-        .map_err(|e| format!("token balance read failed: {e}"))?;
-
-    balance
-        .amount
-        .parse::<u64>()
-        .map_err(|e| format!("token balance parse failed: {e}"))
-}
-
-fn calculate_local_amount_out(
-    amount_in: u64,
-    reserve_in: u64,
-    reserve_out: u64,
-    fee_bps: u16,
-) -> Result<u64, String> {
-    memelab_amm::math::amount_out(amount_in, reserve_in, reserve_out, fee_bps)
-        .map_err(|e| format!("AMM quote failed: {e:?}"))
-}
-
-fn build_buy_instruction(
-    trader: Pubkey,
-    pool: Pubkey,
-    mint: Pubkey,
-    vault: Pubkey,
-    trader_mlab_account: Pubkey,
-    sol_amount: u64,
-    min_mlab_out: u64,
-) -> Instruction {
-    Instruction::new_with_bytes(
-        memelab_amm::ID,
-        &memelab_amm::instruction::SwapSolForMlab {
-            sol_amount,
-            min_mlab_out,
-        }
-        .data(),
-        memelab_amm::accounts::SwapSolForMlab {
-            trader,
-            pool,
-            mlab_mint: mint,
-            mlab_vault: vault,
-            trader_mlab_account,
-            token_program: anchor_spl::token_interface::spl_token_2022::ID,
-            system_program: anchor_lang::solana_program::system_program::ID,
-        }
-        .to_account_metas(None),
-    )
-}
-
-fn build_sell_instruction(
-    trader: Pubkey,
-    pool: Pubkey,
-    mint: Pubkey,
-    vault: Pubkey,
-    trader_mlab_account: Pubkey,
-    mlab_amount: u64,
-    min_sol_out: u64,
-) -> Instruction {
-    Instruction::new_with_bytes(
-        memelab_amm::ID,
-        &memelab_amm::instruction::SwapMlabForSol {
-            mlab_amount,
-            min_sol_out,
-        }
-        .data(),
-        memelab_amm::accounts::SwapMlabForSol {
-            trader,
-            pool,
-            mlab_mint: mint,
-            mlab_vault: vault,
-            trader_mlab_account,
-            token_program: anchor_spl::token_interface::spl_token_2022::ID,
-            system_program: anchor_lang::solana_program::system_program::ID,
-        }
-        .to_account_metas(None),
-    )
-}
-
-fn run_buy_sell_self_test(
-    client: &RpcClient,
-    payer: &Keypair,
-    artifacts: &LaunchArtifacts,
-) -> Result<(), String> {
-    println!();
-    println!("==================================================");
-    println!(" MEME LAB v0.3 BUY -> SELL SELF-TEST");
-    println!("==================================================");
-    println!("Network: LOCALHOST ONLY");
-    println!("Mint:    {}", artifacts.mint);
-    println!("Pool:    {}", artifacts.pool);
-    println!("Vault:   {}", artifacts.vault);
-    println!("Trader:  {}", payer.pubkey());
-    println!("Token:   {}", artifacts.source);
-    println!();
-
-    // --------------------------------------------------------------
-    // Initial verification
-    // --------------------------------------------------------------
-    verify_pool(client, artifacts.mint, artifacts.pool, artifacts.vault)?;
-
-    let initial_pool = read_pool_snapshot(client, artifacts.pool)?;
-    let initial_token_balance = token_balance(client, artifacts.source)?;
-    let initial_vault_balance = token_balance(client, artifacts.vault)?;
-
-    if initial_pool.mlab_mint != artifacts.mint {
-        return Err("SELF-TEST RED: pool mint mismatch".into());
-    }
-
-    if initial_pool.mlab_vault != artifacts.vault {
-        return Err("SELF-TEST RED: pool vault mismatch".into());
-    }
-
-    if initial_pool.sol_reserve == 0 {
-        return Err("SELF-TEST RED: SOL reserve is zero".into());
-    }
-
-    if initial_pool.mlab_reserve == 0 {
-        return Err("SELF-TEST RED: MLAB reserve is zero".into());
-    }
-
-    if initial_vault_balance != initial_pool.mlab_reserve {
-        return Err(format!(
-            "SELF-TEST RED: initial vault/reserve mismatch: vault={} reserve={}",
-            initial_vault_balance, initial_pool.mlab_reserve
-        ));
-    }
-
-    println!("Initial pool:       GREEN");
-    println!("Initial vault:      GREEN");
-    println!("Initial liquidity:  GREEN");
-    println!("Initial token bal:  {initial_token_balance}");
-
-    // --------------------------------------------------------------
-    // BUY
-    // --------------------------------------------------------------
-    //
-    // 0.001 SOL = 1,000,000 lamports.
-    //
-    // Quote against the exact current pool state and submit that
-    // quote as the minimum acceptable output.
-    // --------------------------------------------------------------
-    let buy_sol = 1_000_000u64;
-
-    let quoted_buy = calculate_local_amount_out(
-        buy_sol,
-        initial_pool.sol_reserve,
-        initial_pool.mlab_reserve,
-        initial_pool.fee_bps,
-    )?;
-
-    if quoted_buy == 0 {
-        return Err("SELF-TEST RED: BUY quote returned zero".into());
-    }
-
-    println!();
-    println!("[BUY]");
-    println!("Input:      {} lamports", buy_sol);
-    println!("Quote:      {} token units", quoted_buy);
-    println!("Min output: {} token units", quoted_buy);
-
-    let buy_ix = build_buy_instruction(
-        payer.pubkey(),
-        artifacts.pool,
-        artifacts.mint,
-        artifacts.vault,
-        artifacts.source,
-        buy_sol,
-        quoted_buy,
-    );
-
-    let buy_sig = send_instruction(client, payer, buy_ix)?;
-
-    println!("BUY sig:    {buy_sig}");
-
-    let after_buy_pool = read_pool_snapshot(client, artifacts.pool)?;
-    let after_buy_token_balance = token_balance(client, artifacts.source)?;
-    let after_buy_vault_balance = token_balance(client, artifacts.vault)?;
-
-    let actual_bought = after_buy_token_balance
-        .checked_sub(initial_token_balance)
-        .ok_or_else(|| "SELF-TEST RED: BUY token balance decreased".to_string())?;
-
-    if actual_bought != quoted_buy {
-        return Err(format!(
-            "SELF-TEST RED: BUY output mismatch: quoted={} actual={}",
-            quoted_buy, actual_bought
-        ));
-    }
-
-    if after_buy_pool.sol_reserve != initial_pool.sol_reserve + buy_sol {
-        return Err(format!(
-            "SELF-TEST RED: BUY SOL reserve mismatch: expected={} actual={}",
-            initial_pool.sol_reserve + buy_sol,
-            after_buy_pool.sol_reserve
-        ));
-    }
-
-    if after_buy_pool.mlab_reserve != initial_pool.mlab_reserve - quoted_buy {
-        return Err(format!(
-            "SELF-TEST RED: BUY MLAB reserve mismatch: expected={} actual={}",
-            initial_pool.mlab_reserve - quoted_buy,
-            after_buy_pool.mlab_reserve
-        ));
-    }
-
-    if after_buy_vault_balance != after_buy_pool.mlab_reserve {
-        return Err(format!(
-            "SELF-TEST RED: BUY vault/reserve mismatch: vault={} reserve={}",
-            after_buy_vault_balance, after_buy_pool.mlab_reserve
-        ));
-    }
-
-    println!("BUY execution:      GREEN");
-    println!("BUY output:         {actual_bought}");
-    println!("BUY accounting:     GREEN");
-    println!("BUY vault match:    GREEN");
-
-    // --------------------------------------------------------------
-    // SELL
-    // --------------------------------------------------------------
-    //
-    // Sell the exact amount purchased above.
-    // Quote against the post-BUY pool state.
-    // --------------------------------------------------------------
-    let sell_amount = actual_bought;
-
-    let quoted_sell = calculate_local_amount_out(
-        sell_amount,
-        after_buy_pool.mlab_reserve,
-        after_buy_pool.sol_reserve,
-        after_buy_pool.fee_bps,
-    )?;
-
-    if quoted_sell == 0 {
-        return Err("SELF-TEST RED: SELL quote returned zero".into());
-    }
-
-    println!();
-    println!("[SELL]");
-    println!("Input:      {} token units", sell_amount);
-    println!("Quote:      {} lamports", quoted_sell);
-    println!("Min output: {} lamports", quoted_sell);
-
-    let sell_ix = build_sell_instruction(
-        payer.pubkey(),
-        artifacts.pool,
-        artifacts.mint,
-        artifacts.vault,
-        artifacts.source,
-        sell_amount,
-        quoted_sell,
-    );
-
-    let sell_sig = send_instruction(client, payer, sell_ix)?;
-
-    println!("SELL sig:   {sell_sig}");
-
-    let final_pool = read_pool_snapshot(client, artifacts.pool)?;
-    let final_token_balance = token_balance(client, artifacts.source)?;
-    let final_vault_balance = token_balance(client, artifacts.vault)?;
-
-    if final_token_balance != initial_token_balance {
-        return Err(format!(
-            "SELF-TEST RED: token round-trip mismatch: initial={} final={}",
-            initial_token_balance, final_token_balance
-        ));
-    }
-
-    if final_pool.mlab_reserve != initial_pool.mlab_reserve {
-        return Err(format!(
-            "SELF-TEST RED: final MLAB reserve mismatch: initial={} final={}",
-            initial_pool.mlab_reserve, final_pool.mlab_reserve
-        ));
-    }
-
-    if final_pool.sol_reserve != after_buy_pool.sol_reserve - quoted_sell {
-        return Err(format!(
-            "SELF-TEST RED: SELL SOL reserve mismatch: expected={} actual={}",
-            after_buy_pool.sol_reserve - quoted_sell,
-            final_pool.sol_reserve
-        ));
-    }
-
-    if final_vault_balance != final_pool.mlab_reserve {
-        return Err(format!(
-            "SELF-TEST RED: final vault/reserve mismatch: vault={} reserve={}",
-            final_vault_balance, final_pool.mlab_reserve
-        ));
-    }
-
-    println!("SELL execution:     GREEN");
-    println!("SELL output:        {quoted_sell} lamports");
-    println!("SELL accounting:    GREEN");
-    println!("SELL vault match:   GREEN");
-
-    // --------------------------------------------------------------
-    // Final state
-    // --------------------------------------------------------------
-    println!();
-    println!("==================================================");
-    println!(" MEME LAB v0.3 SELF-TEST GREEN");
-    println!("==================================================");
-    println!("Launch path:        GREEN");
-    println!("Token-2022 mint:    GREEN");
-    println!("AMM pool:           GREEN");
-    println!("Token vault:        GREEN");
-    println!("BUY:                GREEN");
-    println!("SELL:               GREEN");
-    println!("Round trip:         GREEN");
-    println!("Final token bal:    {final_token_balance}");
-    println!("Final MLAB reserve: {}", final_pool.mlab_reserve);
-    println!("Final SOL reserve:  {}", final_pool.sol_reserve);
-    println!("Network:            LOCALHOST ONLY");
-    println!("==================================================");
-    Ok(())
-}
-
 fn main() {
     let args: Vec<String> = env::args().collect();
-
-    let self_test = args
-        .get(1)
-        .map(|v| v == "--self-test-local")
-        .unwrap_or(false);
-
     let execute = args.get(1).map(|v| v == "--launch-local").unwrap_or(false);
-
-    let offset = if self_test || execute { 2 } else { 1 };
+    let offset = if execute { 2 } else { 1 };
 
     if args.len() != offset + 8 {
         usage();
@@ -680,8 +309,7 @@ fn main() {
         sol_liquidity: args[offset + 5].clone(),
         token_liquidity: args[offset + 6].clone(),
         fee_bps: args[offset + 7].parse().unwrap_or(u16::MAX),
-        execute: execute || self_test,
-        self_test,
+        execute,
     };
 
     let (supply_units, token_liquidity_units, sol_liquidity_lamports) =
@@ -693,10 +321,10 @@ fn main() {
             }
         };
 
-    println!("=== MEME LAB LAUNCHER v0.3 ===");
-    println!("Network:         LOCALHOST ONLY");
-    println!("AMM:             {AMM_PROGRAM}");
-    println!("Token program:   {TOKEN_2022_PROGRAM}");
+    println!("=== MEME LAB LAUNCHER v0.2 ===");
+    println!("Network:        LOCALHOST ONLY");
+    println!("AMM:            {AMM_PROGRAM}");
+    println!("Token program:  {TOKEN_2022_PROGRAM}");
     println!("Name:            {}", config.name);
     println!("Symbol:          {}", config.symbol);
     println!("Supply:          {}", config.supply);
@@ -710,22 +338,14 @@ fn main() {
     println!("SOL lamports:    {sol_liquidity_lamports}");
 
     if !config.execute {
-        println!();
         println!("Status: PLAN GREEN");
         println!("No transactions submitted.");
-        println!("Use --launch-local to execute locally.");
-        println!("Use --self-test-local to launch + BUY + SELL + verify.");
+        println!("Use --launch-local to execute against http://localhost:8899.");
         return;
     }
 
-    println!();
     println!("=== LOCAL LAUNCH EXECUTION ===");
-
-    if config.self_test {
-        println!("Mode: FULL LAUNCH + BUY/SELL SELF-TEST");
-    } else {
-        println!("Mode: FULL LAUNCH");
-    }
+    println!("Mode: FULL LAUNCH");
 
     let payer_path = home_dir()
         .expect("Could not determine home directory")
@@ -741,8 +361,8 @@ fn main() {
         .expect("Could not read local payer balance");
 
     assert!(
-        balance > sol_liquidity_lamports + 100_000_000,
-        "payer does not have enough local SOL for requested liquidity + safety buffer"
+        balance > sol_liquidity_lamports,
+        "payer does not have enough local SOL for requested liquidity"
     );
 
     println!("Payer:           {}", payer.pubkey());
@@ -750,7 +370,6 @@ fn main() {
     let fee_payer = payer_path.to_string_lossy().to_string();
 
     println!("[1/7] Creating Token-2022 mint...");
-
     let mint_output = run_cli(&[
         "--url".into(),
         RPC_URL.into(),
@@ -771,7 +390,6 @@ fn main() {
     println!("Mint:             {mint}");
 
     println!("[2/7] Initializing metadata...");
-
     run_cli(&[
         "--url".into(),
         RPC_URL.into(),
@@ -787,7 +405,6 @@ fn main() {
     .unwrap_or_else(|e| panic!("{e}"));
 
     println!("[3/7] Creating source token account...");
-
     let account_output = run_cli(&[
         "--url".into(),
         RPC_URL.into(),
@@ -805,7 +422,6 @@ fn main() {
     println!("Source account:   {source}");
 
     println!("[4/7] Minting total supply...");
-
     run_cli(&[
         "--url".into(),
         RPC_URL.into(),
@@ -827,7 +443,6 @@ fn main() {
     println!("Vault:            {vault}");
 
     println!("[5/7] Initializing AMM pool...");
-
     let initialize_ix = build_initialize_instruction(payer.pubkey(), mint, pool, config.fee_bps);
 
     let initialize_sig =
@@ -836,7 +451,6 @@ fn main() {
     println!("Initialize sig:   {initialize_sig}");
 
     println!("[6/7] Creating Token-2022 vault...");
-
     let vault_ix = build_create_vault_instruction(payer.pubkey(), mint, pool, vault);
 
     let vault_sig = send_instruction(&client, &payer, vault_ix).unwrap_or_else(|e| panic!("{e}"));
@@ -844,7 +458,6 @@ fn main() {
     println!("Vault sig:        {vault_sig}");
 
     println!("[7/7] Funding pool...");
-
     let fund_ix = build_fund_pool_instruction(
         payer.pubkey(),
         pool,
@@ -861,19 +474,6 @@ fn main() {
 
     verify_pool(&client, mint, pool, vault)
         .unwrap_or_else(|e| panic!("FINAL VERIFICATION FAILED: {e}"));
-
-    let artifacts = LaunchArtifacts {
-        mint,
-        source,
-        pool,
-        vault,
-    };
-
-    if config.self_test {
-        run_buy_sell_self_test(&client, &payer, &artifacts).unwrap_or_else(|e| panic!("{e}"));
-
-        return;
-    }
 
     println!();
     println!("=== MEME LAB LOCAL LAUNCH GREEN ===");
